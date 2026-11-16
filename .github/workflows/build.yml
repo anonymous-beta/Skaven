@@ -53,8 +53,6 @@ jobs:
             echo "[OK] $FILE"
           done
 
-          echo ""
-          echo "Flutter version:"
           flutter --version
 
       - name: Generate Android platform scaffold
@@ -72,23 +70,16 @@ jobs:
           GENERATED_ANDROID="/tmp/skaven_android_scaffold/android"
 
           if [ ! -d "$GENERATED_ANDROID" ]; then
-            echo "::error::Flutter did not generate the Android platform."
-            exit 1
-          fi
-
-          if [ ! -f "$GENERATED_ANDROID/app/src/main/AndroidManifest.xml" ]; then
-            echo "::error::Generated Android manifest is missing."
+            echo "::error::Flutter did not generate Android platform files."
             exit 1
           fi
 
           rm -rf android
           cp -a "$GENERATED_ANDROID" ./android
 
-          echo "Android scaffold generated and installed."
+          echo "Android scaffold generated."
 
-          echo ""
-          echo "Generated Android files:"
-          find android -maxdepth 7 -type f | sort
+          find android -maxdepth 8 -type f | sort
 
       - name: Configure Android manifest
         shell: bash
@@ -142,20 +133,65 @@ jobs:
         run: |
           set -e
 
-          for FILE in \
-            android/settings.gradle \
-            android/app/build.gradle \
-            android/gradle/wrapper/gradle-wrapper.properties \
-            android/gradle/wrapper/gradle-wrapper.jar \
-            android/app/src/main/AndroidManifest.xml \
-            android/app/src/main/kotlin/com/anonymousbeta/skaven/MainActivity.kt
-          do
-            if [ ! -f "$FILE" ]; then
-              echo "::error::Missing Android build file: $FILE"
-              exit 1
-            fi
-            echo "[OK] $FILE"
-          done
+          FOUND_SETTINGS=false
+          FOUND_APP_GRADLE=false
+          FOUND_ACTIVITY=false
+
+          if [ -f android/settings.gradle ] || [ -f android/settings.gradle.kts ]; then
+            FOUND_SETTINGS=true
+            echo "[OK] Gradle settings file"
+          fi
+
+          if [ -f android/app/build.gradle ] || [ -f android/app/build.gradle.kts ]; then
+            FOUND_APP_GRADLE=true
+            echo "[OK] App Gradle file"
+          fi
+
+          if [ -f android/gradle/wrapper/gradle-wrapper.properties ]; then
+            echo "[OK] Gradle wrapper properties"
+          else
+            echo "::error::Gradle wrapper properties missing."
+            exit 1
+          fi
+
+          if [ -f android/gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "[OK] Gradle wrapper JAR"
+          else
+            echo "::error::Gradle wrapper JAR missing."
+            exit 1
+          fi
+
+          if [ -f android/app/src/main/AndroidManifest.xml ]; then
+            echo "[OK] Android manifest"
+          else
+            echo "::error::Android manifest missing."
+            exit 1
+          fi
+
+          if find android/app/src/main -type f -name "MainActivity.kt" | grep -q .; then
+            FOUND_ACTIVITY=true
+            echo "[OK] Kotlin MainActivity found"
+          elif find android/app/src/main -type f -name "MainActivity.java" | grep -q .; then
+            FOUND_ACTIVITY=true
+            echo "[OK] Java MainActivity found"
+          fi
+
+          if [ "$FOUND_SETTINGS" != true ]; then
+            echo "::error::Gradle settings file missing."
+            exit 1
+          fi
+
+          if [ "$FOUND_APP_GRADLE" != true ]; then
+            echo "::error::App Gradle file missing."
+            exit 1
+          fi
+
+          if [ "$FOUND_ACTIVITY" != true ]; then
+            echo "::error::Android MainActivity missing."
+            exit 1
+          fi
+
+          echo "Android scaffold verification passed."
 
       - name: Resolve Flutter dependencies
         run: flutter pub get
