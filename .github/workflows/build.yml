@@ -24,29 +24,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Install Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Flutter
+      - name: Install Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install Pillow
-
-      - name: Create Android scaffold if missing
+      - name: Create Android project files if missing
         run: |
           if [ ! -f android/gradlew ]; then
             flutter create \
@@ -56,13 +46,17 @@ jobs:
               .
           fi
 
-      - name: Generate launcher icons
-        run: python scripts/generate_icons.py
+      - name: Verify project files
+        run: |
+          test -f pubspec.yaml
+          test -f lib/main.dart
+          test -f lib/services/recon_service.dart
+          test -f android/app/src/main/AndroidManifest.xml
 
       - name: Get Flutter dependencies
         run: flutter pub get
 
-      - name: Analyze Dart code
+      - name: Analyze Flutter project
         run: flutter analyze --no-fatal-infos
 
       - name: Run Flutter tests
@@ -73,10 +67,12 @@ jobs:
 
       - name: Verify APK
         run: |
-          test -s build/app/outputs/flutter-apk/app-release.apk
-          ls -lh build/app/outputs/flutter-apk/app-release.apk
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+          test -s "$APK"
+          echo "APK successfully generated:"
+          ls -lh "$APK"
 
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: SKAVEN-Android-Release
