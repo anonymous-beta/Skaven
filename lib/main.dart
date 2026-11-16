@@ -1,6 +1,5 @@
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -276,6 +275,7 @@ class ReconService {
 
           if (status >= 300 && status < 400) {
             final location = _header(response, 'location');
+
             if (location != null) {
               report.redirect = location;
               report.findings.add(
@@ -321,8 +321,9 @@ class ReconService {
             }
           }
 
-          for (final element in
-              document.querySelectorAll('link[rel~="stylesheet"][href]')) {
+          for (final element in document.querySelectorAll(
+            'link[rel~="stylesheet"][href]',
+          )) {
             final href = element.attributes['href'];
             final uri = _safeSameOriginUri(href, current);
 
@@ -389,25 +390,28 @@ class ReconService {
 
         try {
           await _validatePublicHost(asset);
+
           final response = await _request(asset, maxAssetBytes);
           final status = response.statusCode ?? 0;
 
           if (status < 200 || status >= 300) continue;
 
           final source = response.data?.toString() ?? '';
+
           _extractEndpoints(source, asset, report);
           _fingerprint(source, report);
 
           report.findings.add(
             Finding(
               title: 'Public asset inspected',
-              detail: 'Inspected ${asset.path} (${source.length} characters).',
+              detail: 'Inspected ${asset.path} '
+                  '(${source.length} characters).',
               level: FindingLevel.info,
               category: 'Source',
             ),
           );
         } catch (_) {
-          // One unavailable asset must not abort the entire scan.
+          // An unavailable asset does not abort the entire scan.
         }
       }
 
@@ -421,6 +425,7 @@ class ReconService {
     } catch (e) {
       report.error = e.toString();
       report.completed = DateTime.now();
+
       report.findings.add(
         Finding(
           title: 'Scan could not complete',
@@ -429,6 +434,7 @@ class ReconService {
           category: 'Scanner',
         ),
       );
+
       return report;
     }
   }
@@ -518,14 +524,16 @@ class ReconService {
       final allZero = bytes.every((b) => b == 0);
       if (allZero) return false;
 
-      final loopback = bytes.take(15).every((b) => b == 0) &&
-          bytes[15] == 1;
-      if (loopback) return false;
+      final loopback =
+          bytes.take(15).every((b) => b == 0) && bytes[15] == 1;
 
+      if (loopback) return false;
       if ((bytes[0] & 0xFE) == 0xFC) return false;
+
       if (bytes[0] == 0xFE && (bytes[1] & 0xC0) == 0x80) {
         return false;
       }
+
       if (bytes[0] == 0xFF) return false;
 
       final mapped = bytes.take(10).every((b) => b == 0) &&
@@ -548,7 +556,9 @@ class ReconService {
 
   Future<String> _resolvePublicIp(String host) async {
     final addresses = await InternetAddress.lookup(host);
+
     if (addresses.isEmpty) return 'Unavailable';
+
     return addresses.first.address;
   }
 
@@ -563,7 +573,9 @@ class ReconService {
       final certificate = socket.peerCertificate;
       socket.destroy();
 
-      if (certificate == null) return 'Certificate information unavailable';
+      if (certificate == null) {
+        return 'Certificate information unavailable';
+      }
 
       return 'Issuer: ${certificate.issuer}; '
           'Expires: ${certificate.endValidity.toIso8601String()}';
@@ -573,27 +585,32 @@ class ReconService {
   }
 
   Future<Response<dynamic>> _request(Uri uri, int maxBytes) {
-    return _dio.getUri<dynamic>(
-      uri,
-      options: Options(
-        responseType: ResponseType.plain,
-        followRedirects: false,
-        maxRedirects: 0,
-        headers: const {'Accept-Encoding': 'identity'},
-        receiveDataWhenStatusError: true,
-      ),
-    ).timeout(
-      const Duration(seconds: 20),
-      onTimeout: () => throw TimeoutException('Request timed out.'),
-    ).then((response) {
-      final body = response.data?.toString() ?? '';
+    return _dio
+        .getUri<dynamic>(
+          uri,
+          options: Options(
+            responseType: ResponseType.plain,
+            followRedirects: false,
+            maxRedirects: 0,
+            headers: const {'Accept-Encoding': 'identity'},
+            receiveDataWhenStatusError: true,
+          ),
+        )
+        .timeout(
+          const Duration(seconds: 20),
+          onTimeout: () => throw TimeoutException('Request timed out.'),
+        )
+        .then((response) {
+          final body = response.data?.toString() ?? '';
 
-      if (body.length > maxBytes) {
-        throw const FormatException('Response exceeded the inspection limit.');
-      }
+          if (body.length > maxBytes) {
+            throw const FormatException(
+              'Response exceeded the inspection limit.',
+            );
+          }
 
-      return response;
-    });
+          return response;
+        });
   }
 
   String? _header(Response<dynamic> response, String name) {
@@ -602,6 +619,7 @@ class ReconService {
         .expand((entry) => entry.value);
 
     if (values.isEmpty) return null;
+
     return values.join(', ');
   }
 
@@ -682,6 +700,7 @@ class ReconService {
     for (final entry in signatures.entries) {
       if (entry.value.any(combined.contains)) {
         report.waf = entry.key;
+
         report.findings.add(
           Finding(
             title: 'Possible WAF or edge service identified',
@@ -691,6 +710,7 @@ class ReconService {
             category: 'Infrastructure',
           ),
         );
+
         return;
       }
     }
@@ -742,9 +762,11 @@ class ReconService {
     for (final pattern in patterns) {
       for (final match in pattern.allMatches(source)) {
         final value = match.group(1);
+
         if (value == null || value.isEmpty) continue;
 
         final uri = _safeSameOriginUri(value, base);
+
         if (uri != null) {
           _addUnique(report.endpoints, uri.toString());
         }
@@ -784,16 +806,31 @@ class ReconService {
     final path = uri.path.toLowerCase();
 
     const extensions = [
-      '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg',
-      '.pdf', '.zip', '.mp4', '.mp3', '.woff', '.woff2',
-      '.ttf', '.ico', '.exe', '.apk',
+      '.png',
+      '.jpg',
+      '.jpeg',
+      '.gif',
+      '.webp',
+      '.svg',
+      '.pdf',
+      '.zip',
+      '.mp4',
+      '.mp3',
+      '.woff',
+      '.woff2',
+      '.ttf',
+      '.ico',
+      '.exe',
+      '.apk',
     ];
 
     return extensions.any(path.endsWith);
   }
 
   void _addUnique(List<String> list, String value) {
-    if (!list.contains(value)) list.add(value);
+    if (!list.contains(value)) {
+      list.add(value);
+    }
   }
 
   void dispose() {
@@ -833,7 +870,9 @@ class _SkavenHomeState extends State<SkavenHome> {
 
   Future<void> _loadHistory() async {
     final prefs = await SharedPreferences.getInstance();
+
     if (!mounted) return;
+
     setState(() {
       _history = prefs.getStringList('skaven_history') ?? [];
     });
@@ -852,7 +891,10 @@ class _SkavenHomeState extends State<SkavenHome> {
     );
 
     if (!mounted) return;
-    setState(() => _history = items.take(20).toList());
+
+    setState(() {
+      _history = items.take(20).toList();
+    });
   }
 
   Future<void> _startScan() async {
@@ -897,7 +939,10 @@ class _SkavenHomeState extends State<SkavenHome> {
 
   void _cancelScan() {
     _scanner.cancel();
-    setState(() => _status = 'CANCELLATION REQUESTED');
+
+    setState(() {
+      _status = 'CANCELLATION REQUESTED';
+    });
   }
 
   void _message(String value) {
@@ -908,6 +953,7 @@ class _SkavenHomeState extends State<SkavenHome> {
 
   Future<void> _exportReport() async {
     final report = _report;
+
     if (report == null) return;
 
     await Clipboard.setData(
@@ -915,12 +961,16 @@ class _SkavenHomeState extends State<SkavenHome> {
     );
 
     if (!mounted) return;
+
     _message('Report copied to clipboard.');
   }
 
   void _openHistoryTarget(String target) {
     _targetController.text = target;
-    setState(() => _selectedTab = 0);
+
+    setState(() {
+      _selectedTab = 0;
+    });
   }
 
   @override
@@ -970,7 +1020,9 @@ class _SkavenHomeState extends State<SkavenHome> {
         backgroundColor: skavenPanel,
         selectedIndex: _selectedTab,
         onDestinationSelected: (index) {
-          setState(() => _selectedTab = index);
+          setState(() {
+            _selectedTab = index;
+          });
         },
         destinations: const [
           NavigationDestination(
@@ -1002,14 +1054,7 @@ class _SkavenHomeState extends State<SkavenHome> {
       children: [
         _hero(),
         const SizedBox(height: 20),
-        const Text(
-          'TARGET RECONNAISSANCE',
-          style: TextStyle(
-            color: skavenOrange,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.5,
-          ),
-        ),
+        _sectionTitle('TARGET RECONNAISSANCE'),
         const SizedBox(height: 10),
         TextField(
           controller: _targetController,
@@ -1072,16 +1117,31 @@ class _SkavenHomeState extends State<SkavenHome> {
         ],
         const SizedBox(height: 24),
         _sectionTitle('RECONNAISSANCE MODULES'),
-        _moduleTile(Icons.travel_explore, 'Website crawler',
-            'Bounded same-origin page discovery'),
-        _moduleTile(Icons.code, 'Source intelligence',
-            'Public HTML, JavaScript and CSS inspection'),
-        _moduleTile(Icons.api, 'API discovery',
-            'Observable REST and GraphQL route extraction'),
-        _moduleTile(Icons.dns, 'Network intelligence',
-            'DNS resolution and TLS certificate details'),
-        _moduleTile(Icons.security, 'Security analysis',
-            'Response headers and passive WAF indicators'),
+        _moduleTile(
+          Icons.travel_explore,
+          'Website crawler',
+          'Bounded same-origin page discovery',
+        ),
+        _moduleTile(
+          Icons.code,
+          'Source intelligence',
+          'Public HTML, JavaScript and CSS inspection',
+        ),
+        _moduleTile(
+          Icons.api,
+          'API discovery',
+          'Observable REST and GraphQL route extraction',
+        ),
+        _moduleTile(
+          Icons.dns,
+          'Network intelligence',
+          'DNS resolution and TLS certificate details',
+        ),
+        _moduleTile(
+          Icons.security,
+          'Security analysis',
+          'Response headers and passive WAF indicators',
+        ),
         const SizedBox(height: 25),
         _creatorFooter(),
       ],
@@ -1098,7 +1158,9 @@ class _SkavenHomeState extends State<SkavenHome> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        border: Border.all(color: skavenOrange.withValues(alpha: 0.35)),
+        border: Border.all(
+          color: skavenOrange.withValues(alpha: 0.35),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1119,9 +1181,13 @@ class _SkavenHomeState extends State<SkavenHome> {
             style: TextStyle(color: skavenSteel),
           ),
           const SizedBox(height: 16),
-          Row(
-            children: const [
-              Icon(Icons.circle, color: Colors.greenAccent, size: 9),
+          const Row(
+            children: [
+              Icon(
+                Icons.circle,
+                color: Colors.greenAccent,
+                size: 9,
+              ),
               SizedBox(width: 7),
               Text(
                 'RECON ENGINE ONLINE',
@@ -1186,8 +1252,11 @@ class _SkavenHomeState extends State<SkavenHome> {
       childAspectRatio: 1.8,
       children: [
         _statCard('PAGES', '${report.pages.length}', Icons.web),
-        _statCard('ASSETS', '${report.scripts.length + report.stylesheets.length}',
-            Icons.insert_drive_file),
+        _statCard(
+          'ASSETS',
+          '${report.scripts.length + report.stylesheets.length}',
+          Icons.insert_drive_file,
+        ),
         _statCard('ENDPOINTS', '${report.endpoints.length}', Icons.api),
         _statCard('FINDINGS', '${report.findings.length}', Icons.bug_report),
       ],
@@ -1306,19 +1375,34 @@ class _SkavenHomeState extends State<SkavenHome> {
       padding: const EdgeInsets.all(16),
       children: [
         _sectionTitle('DISCOVERED TECHNOLOGIES'),
-        ..._stringList(report.technologies, 'No technologies fingerprinted.'),
+        ..._stringList(
+          report.technologies,
+          'No technologies fingerprinted.',
+        ),
         const SizedBox(height: 18),
         _sectionTitle('OBSERVED API ENDPOINTS'),
-        ..._stringList(report.endpoints, 'No recognizable endpoints found.'),
+        ..._stringList(
+          report.endpoints,
+          'No recognizable endpoints found.',
+        ),
         const SizedBox(height: 18),
         _sectionTitle('PUBLIC JAVASCRIPT'),
-        ..._stringList(report.scripts, 'No scripts discovered.'),
+        ..._stringList(
+          report.scripts,
+          'No scripts discovered.',
+        ),
         const SizedBox(height: 18),
         _sectionTitle('PUBLIC STYLESHEETS'),
-        ..._stringList(report.stylesheets, 'No stylesheets discovered.'),
+        ..._stringList(
+          report.stylesheets,
+          'No stylesheets discovered.',
+        ),
         const SizedBox(height: 18),
         _sectionTitle('CRAWLED PAGES'),
-        ..._stringList(report.pages, 'No pages crawled.'),
+        ..._stringList(
+          report.pages,
+          'No pages crawled.',
+        ),
         const SizedBox(height: 18),
         _sectionTitle('HTTP RESPONSE HEADERS'),
         ...report.headers.entries.map(
@@ -1333,7 +1417,10 @@ class _SkavenHomeState extends State<SkavenHome> {
       return [
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Text(emptyText, style: const TextStyle(color: Colors.white54)),
+          child: Text(
+            emptyText,
+            style: const TextStyle(color: Colors.white54),
+          ),
         ),
       ];
     }
@@ -1376,9 +1463,15 @@ class _SkavenHomeState extends State<SkavenHome> {
           (target) => Card(
             color: skavenPanel,
             child: ListTile(
-              leading: const Icon(Icons.language, color: skavenOrange),
+              leading: const Icon(
+                Icons.language,
+                color: skavenOrange,
+              ),
               title: Text(target),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+              trailing: const Icon(
+                Icons.arrow_forward_ios,
+                size: 14,
+              ),
               onTap: () => _openHistoryTarget(target),
             ),
           ),
@@ -1387,13 +1480,20 @@ class _SkavenHomeState extends State<SkavenHome> {
         const Text(
           'History stores target addresses on this device. '
           'It does not store authentication tokens or website credentials.',
-          style: TextStyle(color: Colors.white54, fontSize: 12),
+          style: TextStyle(
+            color: Colors.white54,
+            fontSize: 12,
+          ),
         ),
       ],
     );
   }
 
-  Widget _emptyState(IconData icon, String title, String detail) {
+  Widget _emptyState(
+    IconData icon,
+    String title,
+    String detail,
+  ) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(30),
@@ -1460,7 +1560,11 @@ class _SkavenHomeState extends State<SkavenHome> {
     );
   }
 
-  Widget _moduleTile(IconData icon, String title, String detail) {
+  Widget _moduleTile(
+    IconData icon,
+    String title,
+    String detail,
+  ) {
     return Card(
       color: skavenPanel,
       child: ListTile(
