@@ -17,18 +17,19 @@ concurrency:
 
 jobs:
   build:
-    name: Build SKAVEN APK
+    name: Build SKAVEN Android APK
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
+          cache: gradle
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -36,47 +37,144 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Diagnose project files
+      - name: Check Flutter project files
         shell: bash
         run: |
-          echo "Checking SKAVEN project structure..."
+          set -e
 
-          FAILED=0
+          echo "Checking SKAVEN project..."
 
-          for FILE in \
-            pubspec.yaml \
-            lib/main.dart \
-            lib/services/recon_service.dart \
-            android/app/src/main/AndroidManifest.xml
-          do
-            if [ -f "$FILE" ]; then
-              echo "[OK] $FILE"
-            else
-              echo "[MISSING] $FILE"
-              FAILED=1
+          REQUIRED_FILES=(
+            "pubspec.yaml"
+            "lib/main.dart"
+            "lib/services/recon_service.dart"
+          )
+
+          for FILE in "${REQUIRED_FILES[@]}"; do
+            if [ ! -f "$FILE" ]; then
+              echo "::error::Missing required file: $FILE"
+              exit 1
             fi
+
+            echo "[OK] $FILE"
           done
 
-          echo ""
-          echo "LIB DIRECTORY:"
-          find lib -maxdepth 5 -type f 2>/dev/null || true
+      - name: Generate clean Android embedding v2 project
+        shell: bash
+        run: |
+          set -e
 
-          echo ""
-          echo "ANDROID DIRECTORY:"
-          find android -maxdepth 5 -type f 2>/dev/null || true
+          echo "Generating Android platform scaffold..."
 
-          if [ "$FAILED" -ne 0 ]; then
-            echo "::error::One or more required project files are missing."
+          flutter create \
+            --no-pub \
+            --platforms=android \
+            --org com.anonymousbeta \
+            --project-name skaven \
+            /tmp/skaven_android_scaffold
+
+          if [ ! -f "/tmp/skaven_android_scaffold/android/app/src/main/kotlin/com/anonymousbeta/skaven/MainActivity.kt" ]; then
+            echo "::error::Flutter did not generate the expected MainActivity.kt"
+            find /tmp/skaven_android_scaffold/android -type f
             exit 1
           fi
 
-          echo "All required project files are present."
+          echo "Replacing incomplete Android project..."
 
-      - name: Verify Flutter project
+          rm -rf android
+          mkdir -p android
+
+          cp -a /tmp/skaven_android_scaffold/android/. android/
+
+          echo "Android embedding v2 scaffold generated."
+
+      - name: Configure SKAVEN Android manifest
+        shell: bash
+        run: |
+          set -e
+
+          mkdir -p android/app/src/main
+
+          cat > android/app/src/main/AndroidManifest.xml <<'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+              <application
+                  android:label="SKAVEN"
+                  android:name="${applicationName}"
+                  android:icon="@mipmap/ic_launcher"
+                  android:usesCleartextTraffic="true"
+                  android:allowBackup="false"
+                  android:supportsRtl="true">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:launchMode="singleTop"
+                      android:theme="@style/LaunchTheme"
+                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+                      android:hardwareAccelerated="true"
+                      android:windowSoftInputMode="adjustResize">
+
+                      <meta-data
+                          android:name="io.flutter.embedding.android.NormalTheme"
+                          android:resource="@style/NormalTheme" />
+
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+
+                  </activity>
+
+                  <meta-data
+                      android:name="flutterEmbedding"
+                      android:value="2" />
+
+              </application>
+          </manifest>
+          EOF
+
+          echo "Manifest configured."
+
+      - name: Verify Android platform files
+        shell: bash
+        run: |
+          set -e
+
+          REQUIRED_ANDROID_FILES=(
+            "android/settings.gradle"
+            "android/build.gradle"
+            "android/app/build.gradle"
+            "android/gradle/wrapper/gradle-wrapper.properties"
+            "android/gradle/wrapper/gradle-wrapper.jar"
+            "android/app/src/main/AndroidManifest.xml"
+            "android/app/src/main/kotlin/com/anonymousbeta/skaven/MainActivity.kt"
+          )
+
+          for FILE in "${REQUIRED_ANDROID_FILES[@]}"; do
+            if [ ! -f "$FILE" ]; then
+              echo "::error::Android scaffold is incomplete: $FILE"
+              find android -type f
+              exit 1
+            fi
+
+            echo "[OK] $FILE"
+          done
+
+          echo ""
+          echo "Generated MainActivity:"
+          cat android/app/src/main/kotlin/com/anonymousbeta/skaven/MainActivity.kt
+
+      - name: Flutter diagnostics
         run: |
           flutter --version
           flutter doctor -v
-          flutter pub get
+
+      - name: Install dependencies
+        run: flutter pub get
 
       - name: Analyze Flutter code
         run: flutter analyze --no-fatal-infos
@@ -87,9 +185,11 @@ jobs:
       - name: Build release APK
         run: flutter build apk --release
 
-      - name: Verify APK output
+      - name: Verify APK
         shell: bash
         run: |
+          set -e
+
           APK="build/app/outputs/flutter-apk/app-release.apk"
 
           if [ ! -s "$APK" ]; then
@@ -97,10 +197,10 @@ jobs:
             exit 1
           fi
 
-          echo "SKAVEN APK generated successfully:"
+          echo "SKAVEN APK successfully generated."
           ls -lh "$APK"
 
-      - name: Upload Android APK
+      - name: Upload SKAVEN APK
         uses: actions/upload-artifact@v4
         with:
           name: SKAVEN-Android-Release
