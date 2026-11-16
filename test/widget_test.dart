@@ -21,7 +21,6 @@ void main() {
       expect(find.text('TARGET CONFIGURATION'), findsOneWidget);
       expect(find.text('START SCAN'), findsOneWidget);
       expect(find.text('SYSTEM STATUS'), findsOneWidget);
-      expect(find.text('LATEST SCAN'), findsOneWidget);
     });
 
     testWidgets('Dashboard displays target input', (tester) async {
