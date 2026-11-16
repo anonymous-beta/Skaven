@@ -1,7 +1,7 @@
 
-import 'dart:async';
 import 'dart:convert';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -49,7 +49,7 @@ class SkavenApp extends StatelessWidget {
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: Colors.white12),
+            borderSide: const BorderSide(color: Colors.white12),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
@@ -115,16 +115,18 @@ class _SkavenHomeState extends State<SkavenHome> {
       final decoded = jsonDecode(raw) as List<dynamic>;
       final reports = decoded
           .whereType<Map>()
-          .map((item) => ScanReport.fromJson(
-                Map<String, dynamic>.from(item),
-              ))
+          .map(
+            (item) => ScanReport.fromJson(
+              Map<String, dynamic>.from(item),
+            ),
+          )
           .toList();
 
       if (mounted) {
         setState(() => _history = reports);
       }
     } catch (_) {
-      // Ignore an unreadable old history entry.
+      // Ignore unreadable history data.
     }
   }
 
@@ -136,6 +138,7 @@ class _SkavenHomeState extends State<SkavenHome> {
     }
 
     final prefs = await SharedPreferences.getInstance();
+
     await prefs.setString(
       'skaven_history',
       jsonEncode(_history.map((item) => item.toJson()).toList()),
@@ -221,7 +224,10 @@ class _SkavenHomeState extends State<SkavenHome> {
 
   Future<void> _copy(String value) async {
     await Clipboard.setData(ClipboardData(text: value));
-    if (mounted) _message('Copied to clipboard.');
+
+    if (mounted) {
+      _message('Copied to clipboard.');
+    }
   }
 
   Future<void> _exportReport() async {
@@ -290,7 +296,9 @@ class _SkavenHomeState extends State<SkavenHome> {
               decoration: BoxDecoration(
                 color: skavenOrange.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(5),
-                border: Border.all(color: skavenOrange.withValues(alpha: 0.5)),
+                border: Border.all(
+                  color: skavenOrange.withValues(alpha: 0.5),
+                ),
               ),
               child: const Text(
                 'RECON',
@@ -368,15 +376,22 @@ class _SkavenHomeState extends State<SkavenHome> {
             Expanded(
               child: ElevatedButton.icon(
                 onPressed: _scanning ? null : _startScan,
-                icon: Icon(_scanning ? Icons.sync : Icons.play_arrow),
-                label: Text(_scanning ? 'SCANNING' : 'START SCAN'),
+                icon: Icon(
+                  _scanning ? Icons.sync : Icons.play_arrow,
+                ),
+                label: Text(
+                  _scanning ? 'SCANNING' : 'START SCAN',
+                ),
               ),
             ),
             const SizedBox(width: 10),
             if (_scanning)
               OutlinedButton.icon(
                 onPressed: _cancelScan,
-                icon: const Icon(Icons.stop, color: skavenRed),
+                icon: const Icon(
+                  Icons.stop,
+                  color: skavenRed,
+                ),
                 label: const Text('STOP'),
               ),
           ],
@@ -420,15 +435,17 @@ class _SkavenHomeState extends State<SkavenHome> {
     return Container(
       padding: const EdgeInsets.all(19),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           colors: [
-            const Color(0xFF25120D),
+            Color(0xFF25120D),
             skavenPanel,
-            const Color(0xFF181010),
+            Color(0xFF181010),
           ],
         ),
         borderRadius: BorderRadius.circular(13),
-        border: Border.all(color: skavenOrange.withValues(alpha: 0.35)),
+        border: Border.all(
+          color: skavenOrange.withValues(alpha: 0.35),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -444,7 +461,7 @@ class _SkavenHomeState extends State<SkavenHome> {
           ),
           const SizedBox(height: 12),
           const Text(
-            'HUNT THE\\nEXPOSED SURFACE.',
+            'HUNT THE\nEXPOSED SURFACE.',
             style: TextStyle(
               fontSize: 27,
               height: 1.1,
@@ -532,7 +549,11 @@ class _SkavenHomeState extends State<SkavenHome> {
       (Icons.api, 'API discovery', 'Endpoint references'),
       (Icons.dns, 'Network intelligence', 'DNS resolution'),
       (Icons.shield_outlined, 'Security analysis', 'HTTP headers and cookies'),
-      (Icons.description_outlined, 'Discovery files', 'Robots, sitemap, security.txt'),
+      (
+        Icons.description_outlined,
+        'Discovery files',
+        'Robots, sitemap, security.txt',
+      ),
     ];
 
     return GridView.builder(
@@ -630,7 +651,10 @@ class _SkavenHomeState extends State<SkavenHome> {
               const SizedBox(width: 8),
               IconButton(
                 onPressed: _exportReport,
-                icon: const Icon(Icons.copy, color: skavenOrange),
+                icon: const Icon(
+                  Icons.copy,
+                  color: skavenOrange,
+                ),
                 tooltip: 'Copy report',
               ),
             ],
@@ -676,7 +700,10 @@ class _SkavenHomeState extends State<SkavenHome> {
         const SizedBox(height: 7),
         Text(
           _report?.target ?? 'No active report',
-          style: const TextStyle(color: Colors.white54, fontSize: 12),
+          style: const TextStyle(
+            color: Colors.white54,
+            fontSize: 12,
+          ),
         ),
         const SizedBox(height: 15),
         if (findings.isEmpty)
@@ -822,7 +849,10 @@ class _SkavenHomeState extends State<SkavenHome> {
         if (_history.isNotEmpty)
           TextButton.icon(
             onPressed: _clearHistory,
-            icon: const Icon(Icons.delete_outline, color: skavenRed),
+            icon: const Icon(
+              Icons.delete_outline,
+              color: skavenRed,
+            ),
             label: const Text(
               'CLEAR HISTORY',
               style: TextStyle(color: skavenRed),
