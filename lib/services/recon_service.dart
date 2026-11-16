@@ -1,6 +1,5 @@
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -76,9 +75,11 @@ class ScanReport {
       status: json['status']?.toString() ?? 'Unknown',
       findings: (json['findings'] as List<dynamic>? ?? [])
           .whereType<Map>()
-          .map((item) => ScanFinding.fromJson(
-                Map<String, dynamic>.from(item),
-              ))
+          .map(
+            (item) => ScanFinding.fromJson(
+              Map<String, dynamic>.from(item),
+            ),
+          )
           .toList(),
     );
   }
@@ -103,6 +104,7 @@ class _PageResult {
         return entry.value.join(', ');
       }
     }
+
     return '';
   }
 }
@@ -209,6 +211,7 @@ class ReconService {
     }
 
     final queue = <Uri>[target];
+
     _add(
       'Scan scope',
       'This scan is limited to public HTTP/HTTPS resources on the supplied origin. It does not attempt authentication or exploitation.',
@@ -282,8 +285,11 @@ class ReconService {
     if (cancelToken?.isCancelled != true) {
       await _inspectDiscoveryFile(target, '/robots.txt', 'Robots.txt');
       await _inspectDiscoveryFile(target, '/sitemap.xml', 'Sitemap');
-      await _inspectDiscoveryFile(target, '/.well-known/security.txt',
-          'Security.txt');
+      await _inspectDiscoveryFile(
+        target,
+        '/.well-known/security.txt',
+        'Security.txt',
+      );
     }
 
     if (_endpoints.isNotEmpty) {
@@ -352,6 +358,7 @@ class ReconService {
   Uri? _normalizePage(Uri uri) {
     if (uri.scheme != 'http' && uri.scheme != 'https') return null;
     if (uri.userInfo.isNotEmpty) return null;
+
     return uri.replace(fragment: '');
   }
 
@@ -384,10 +391,12 @@ class ReconService {
         severity: 'medium',
         module: 'Website crawler',
       );
+
       return null;
     }
 
     final rawBody = response.data ?? '';
+
     final body = rawBody.length > maxBodyCharacters
         ? rawBody.substring(0, maxBodyCharacters)
         : rawBody;
@@ -401,14 +410,6 @@ class ReconService {
   }
 
   void _inspectHeaders(_PageResult result) {
-    final headers = result.headers;
-
-    _add(
-      'HTTP response',
-      '${result.uri} returned HTTP ${result.statusCode}.',
-      module: 'Website crawler',
-    );
-
     final checks = <String, String>{
       'Strict-Transport-Security':
           'HSTS helps enforce HTTPS connections.',
@@ -424,10 +425,14 @@ class ReconService {
           'Controls access to selected browser features.',
     };
 
-    for (final entry in checks.entries) {
-      final present = result.header(entry.key).isNotEmpty;
+    _add(
+      'HTTP response',
+      '${result.uri} returned HTTP ${result.statusCode}.',
+      module: 'Website crawler',
+    );
 
-      if (!present) {
+    for (final entry in checks.entries) {
+      if (result.header(entry.key).isEmpty) {
         _add(
           'Missing ${entry.key}',
           entry.value,
@@ -438,16 +443,18 @@ class ReconService {
     }
 
     final server = result.header('server');
+
     if (server.isNotEmpty) {
       _technologies.add('Server header: $server');
     }
 
     final powered = result.header('x-powered-by');
+
     if (powered.isNotEmpty) {
       _technologies.add('X-Powered-By: $powered');
     }
 
-    final cookies = headers.entries
+    final cookies = result.headers.entries
         .where((entry) => entry.key.toLowerCase() == 'set-cookie')
         .expand((entry) => entry.value)
         .toList();
@@ -457,6 +464,7 @@ class ReconService {
       final cookieName = cookie.split('=').first;
 
       final flags = <String>[];
+
       if (lower.contains('secure')) flags.add('Secure');
       if (lower.contains('httponly')) flags.add('HttpOnly');
       if (lower.contains('samesite')) flags.add('SameSite');
@@ -476,8 +484,13 @@ class ReconService {
     final server = result.header('server');
     final powered = result.header('x-powered-by');
 
-    if (server.isNotEmpty) _technologies.add('Server: $server');
-    if (powered.isNotEmpty) _technologies.add('Platform: $powered');
+    if (server.isNotEmpty) {
+      _technologies.add('Server: $server');
+    }
+
+    if (powered.isNotEmpty) {
+      _technologies.add('Platform: $powered');
+    }
 
     final body = result.body.toLowerCase();
 
@@ -509,6 +522,7 @@ class ReconService {
 
     for (final match in endpointPattern.allMatches(body)) {
       final value = match.group(1);
+
       if (value == null || value.length > 500) continue;
 
       _endpoints.add(value);
@@ -521,13 +535,13 @@ class ReconService {
 
     for (final match in sourcePattern.allMatches(body)) {
       final value = match.group(1);
+
       if (value != null) {
         _endpoints.add('JavaScript resource: $value');
       }
     }
 
-    final graphql = body.toLowerCase().contains('graphql');
-    if (graphql) {
+    if (body.toLowerCase().contains('graphql')) {
       _endpoints.add('GraphQL reference detected in public source');
     }
   }
@@ -541,6 +555,7 @@ class ReconService {
       if (href == null || href.trim().isEmpty) continue;
 
       final uri = Uri.tryParse(href.trim());
+
       if (uri == null) continue;
 
       final resolved = result.uri.resolveUri(uri);
@@ -573,12 +588,14 @@ class ReconService {
       if (result == null) return;
 
       if (result.statusCode >= 200 && result.statusCode < 300) {
+        final content = result.body.substring(
+          0,
+          result.body.length > 4000 ? 4000 : result.body.length,
+        );
+
         _add(
           '$label found',
-          '${result.uri}\n\n${result.body.substring(
-            0,
-            result.body.length > 4000 ? 4000 : result.body.length,
-          )}',
+          '${result.uri}\n\n$content',
           module: 'Discovery files',
         );
       } else {
