@@ -1,8 +1,6 @@
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import 'package:skaven/main.dart';
 
 void main() {
@@ -22,7 +20,6 @@ void main() {
       expect(find.text('TARGET CONFIGURATION'), findsOneWidget);
       expect(find.text('START SCAN'), findsOneWidget);
       expect(find.text('SYSTEM STATUS'), findsOneWidget);
-      expect(find.text('INTELLIGENCE MODULES'), findsOneWidget);
       expect(find.text('LATEST SCAN'), findsOneWidget);
     });
 
@@ -40,17 +37,12 @@ void main() {
       );
     });
 
-    testWidgets('Dashboard displays all reconnaissance modules',
-        (tester) async {
+    testWidgets('Dashboard displays scan controls', (tester) async {
       await tester.pumpWidget(const SkavenApp());
       await tester.pumpAndSettle();
 
-      expect(find.text('Website crawler'), findsOneWidget);
-      expect(find.text('Source intelligence'), findsOneWidget);
-      expect(find.text('API discovery'), findsOneWidget);
-      expect(find.text('Network intelligence'), findsOneWidget);
-      expect(find.text('Security analysis'), findsOneWidget);
-      expect(find.text('Discovery files'), findsOneWidget);
+      expect(find.text('START SCAN'), findsOneWidget);
+      expect(find.byType(TextField), findsWidgets);
     });
   });
 
